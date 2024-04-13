@@ -1,0 +1,159 @@
+
+#include <ezButton.h>
+#include <Wire.h>                     //Library for I2C interface
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "HX711.h"
+
+const int LOADCELL_DOUT_PIN_1 = A1;
+const int LOADCELL_SCK_PIN_1 = A0;
+
+const int LOADCELL_DOUT_PIN_2 = A3;
+const int LOADCELL_SCK_PIN_2 = A2;
+
+const int LOADCELL_DOUT_PIN_3 = 6;
+const int LOADCELL_SCK_PIN_3 = 5;
+
+const int LOADCELL_DOUT_PIN_4 = 4;
+const int LOADCELL_SCK_PIN_4 = 3;
+
+HX711 scale1;
+HX711 scale2;
+HX711 scale3;
+HX711 scale4;
+
+
+#define LOOP_STATE_STOPPED 0
+#define LOOP_STATE_STARTED 1
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+
+ezButton button(13);  // create ezButton object that attach to pin 7;
+int loopState = LOOP_STATE_STOPPED;
+int beginWeight = 0, beginWeight2 = 0, beginWeight3 = 0, beginWeight4 = 0;
+int endWeight = 0, endWeight2 = 0,endWeight3 = 0, endWeight4 = 0;
+int currentWeight = 0;
+int button_val = 0;
+
+void setup() {
+  Serial.begin(9600);
+  button.setDebounceTime(0);                       // set debounce time to 50 milliseconds
+}
+
+void setupScale(){
+  Serial.println("Initializing the scale");
+  // scale1.set_scale()
+  // Serial.print("scale1 beg: ");
+  // Serial.println(scale1.get_units(10));
+  scale1.begin(LOADCELL_DOUT_PIN_1, LOADCELL_SCK_PIN_1);
+  scale1.set_scale(794.5739);
+  scale1.tare();
+  beginWeight = scale1.get_units(20);
+
+  scale2.begin(LOADCELL_DOUT_PIN_2, LOADCELL_SCK_PIN_2);
+  scale2.set_scale(812.3478);
+  scale2.tare();
+  beginWeight2 = scale2.get_units(20);
+
+  // Serial.print(F("finished scale 2"));
+
+  scale3.begin(LOADCELL_DOUT_PIN_3, LOADCELL_SCK_PIN_3);
+  scale3.set_scale(833.4087);
+  scale3.tare();
+  beginWeight3 = scale3.get_units(20);  
+
+  scale4.begin(LOADCELL_DOUT_PIN_4, LOADCELL_SCK_PIN_4);
+  scale4.set_scale(731.72);
+  scale4.tare();
+  beginWeight4 = scale4.get_units(20);  
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // Address 0x3D for 128x64
+    Serial.println("SSD1306 allocation failed");
+    for(;;);
+  }
+  // Serial.print(F("UNITS: "));
+  // Serial.println(scale2.get_units(10));
+
+  delay(2000);
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 10);
+}
+
+void loop() {
+  button.loop();                                   // MUST call the loop() function first
+  Serial.println(F("Sensing for button..."));
+  if (button.isPressed()) {
+    if (loopState == LOOP_STATE_STOPPED) {
+      loopState = LOOP_STATE_STARTED;
+      setupScale();
+      Serial.println(F("Finish setup"));
+    } else {                                    // if(loopState == LOOP_STATE_STARTED)
+        loopState = LOOP_STATE_STOPPED;
+        Serial.println(F("Dish is finished cooking! Now calculating amount of spice used..."));
+        delay(2000);
+
+        int spice1_used, spice2_used, spice3_used, spice4_used;
+        spice1_used = beginWeight - scale1.get_units();
+        spice2_used = beginWeight2 - scale2.get_units();
+        spice3_used = beginWeight3 - scale3.get_units();
+        spice4_used = beginWeight4 - scale4.get_units();
+        
+        // Serial.print("spice 1 total: ");
+        // Serial.println(spice1_used);
+
+        // display.display(); 
+        // display.clearDisplay();
+        // display.setCursor(0,0);
+        display.print(F("Garlic powder: "));
+        display.print(abs(spice1_used));
+        display.println(F("g"));
+        display.print(F("Paprika: "));
+        display.print(abs(spice2_used));
+        display.println(F("g"));
+        display.print(F("Salt: "));
+        display.print(abs(spice3_used));
+        display.println(F("g"));
+        display.print(F("Pepper: "));
+        display.print(abs(spice4_used));
+        display.println(F("g"));
+        display.display(); 
+        display.clearDisplay();
+        display.setCursor(0,0);
+        delay(1000);
+    }
+
+  } else if (loopState == LOOP_STATE_STARTED) {
+    Serial.println("Now weighing spices!");
+    // display.print(F("spice 1: "));
+    display.print(F("Garlic powder: "));
+    display.println(abs(scale1.get_units()));
+
+    // Serial.print("spice 1: ");
+    // Serial.print(scale1.get_units());
+    // display.print(F("spice 2: "));
+    display.print(F("Paprika: "));
+    // Serial.println(scale2.get_units());
+    // display.println(abs(scale2.get_units()));
+    display.println(abs(scale2.get_units()));
+
+    display.print(F("Salt: "));
+    display.println(abs(scale3.get_units()));
+
+    //kinda breaking here???????????????
+    // display.print(F("spice 4: "));
+    display.print(F("Pepper: "));
+    display.println(abs(scale4.get_units()));
+
+    // Serial.print(F("finished weighing scale4"));
+    display.display(); 
+    display.clearDisplay();
+    display.setCursor(0,0);
+  }
+  delay(500);
+}
+
